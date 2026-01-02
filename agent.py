@@ -2,27 +2,34 @@ import requests
 import memory
 from prompt import SYSTEM_PROMPT
 
-
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "phi"
 
+# 🗺️ Intent → URL map (agent brain)
+SITES = {
+    "youtube": "https://www.youtube.com",
+    "google": "https://www.google.com",
+    "github": "https://github.com",
+    "facebook": "https://www.facebook.com",
+    "instagram": "https://www.instagram.com"
+}
+
 def run_agent(user_input):
-    text = user_input.lower()
+    text = user_input.lower().strip()
 
     # store user message
     memory.add("User", user_input)
 
-    # 🔥 HARD ACTION OVERRIDE
-    if "youtube" in text:
-        return "ACTION:OPEN_URL:https://www.youtube.com"
+    # 🔥 INTENT-BASED ACTION HANDLER (NO LINKS TO USER)
+    if text.startswith("open "):
+        site_name = text.replace("open ", "").strip()
 
-    if "google" in text:
-        return "ACTION:OPEN_URL:https://www.google.com"
+        if site_name in SITES:
+            return f"ACTION:OPEN_URL:{SITES[site_name]}"
+        else:
+            return f"I don't know how to open {site_name}"
 
-    if "github" in text:
-        return "ACTION:OPEN_URL:https://github.com"
-
-    # build conversation context
+    # 🧠 Build conversation context from memory
     context = ""
     for msg in memory.get():
         context += f'{msg["role"]}: {msg["content"]}\n'
@@ -34,7 +41,7 @@ def run_agent(user_input):
     }
 
     response = requests.post(OLLAMA_URL, json=payload).json()
-    reply = response["response"]
+    reply = response.get("response", "").strip()
 
     # store agent reply
     memory.add("Agent", reply)
